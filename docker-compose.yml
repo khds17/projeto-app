@@ -6,6 +6,7 @@ services:
             args:
                 WWWGROUP: '${WWWGROUP}'
         image: sail-8.3/app
+        container_name: projeto
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         ports:
@@ -28,6 +29,7 @@ services:
             - mailpit
     mysql:
         image: 'mysql/mysql-server:8.0'
+        container_name: mysql
         ports:
             - '${FORWARD_DB_PORT:-3306}:3306'
         environment:
@@ -52,6 +54,7 @@ services:
             timeout: 5s
     redis:
         image: 'redis:alpine'
+        container_name: redis
         ports:
             - '${FORWARD_REDIS_PORT:-6379}:6379'
         volumes:
@@ -67,6 +70,7 @@ services:
             timeout: 5s
     selenium:
         image: selenium/standalone-chrome
+        container_name: selenium
         extra_hosts:
             - 'host.docker.internal:host-gateway'
         volumes:
@@ -75,11 +79,54 @@ services:
             - sail
     mailpit:
         image: 'axllent/mailpit:latest'
+        container_name: mailpit
         ports:
             - '${FORWARD_MAILPIT_PORT:-1025}:1025'
             - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
         networks:
             - sail
+    sonarqube:
+        image: sonarqube:community
+        container_name: sonarqube
+        ports:
+            - '9000:9000'
+        networks:
+            - sail
+        depends_on:
+            - sonarqube_db     
+        environment:
+            - SONARQUBE_JDBC_URL=jdbc:postgresql://sonarqube_db:5432/sonar
+            - SONARQUBE_JDBC_USERNAME=sonar
+            - SONARQUBE_JDBC_PASSWORD=sonar
+        volumes:
+            - /home/ubuntu/sonar-data/data:/opt/sonarqube/data
+            - /home/ubuntu/sonar-data/extensions:/opt/sonarqube/extensions
+            - /home/ubuntu/sonar-data/logs:/opt/sonarqube/logs   
+    sonarqube_db:
+        image: postgres
+        container_name: sonarqube_db
+        networks:
+            - sail
+        environment:
+            - POSTGRES_USER=sonar
+            - POSTGRES_PASSWORD=sonar
+        volumes:
+            - /home/ubuntu/postgres/postgresql:/var/lib/postgresql
+            - /home/ubuntu/postgres/data:/var/lib/postgresql/data
+    jenkins:
+        image: jenkins/jenkins:lts
+        container_name: jenkins
+        privileged: true
+        user: root
+        ports:
+            - '8080:8080'
+            - '50000:50000'
+        networks: 
+            - sail
+        volumes:
+            - '/home/jenkins_compose/jenkins_configuration:/var/jenkins_home'
+            - '/var/run/docker.sock:/var/run/docker.sock'
+
 networks:
     sail:
         driver: bridge
@@ -88,3 +135,9 @@ volumes:
         driver: local
     sail-redis:
         driver: local
+    sonarqube_extensions: 
+        driver: /opt/sonarqube/extensions
+    sonarqube_data: 
+        driver: /opt/sonarqube/data
+    sonarqube_logs: 
+        driver: /opt/sonarqube/logs
